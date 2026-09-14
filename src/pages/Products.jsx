@@ -67,7 +67,15 @@ export default function Products({ setActivePage }) {
         <div className="grid grid-3">
           {categoriesList.map((cat, idx) => (
             <div key={idx} className="category-card">
-              <img src={cat.img} alt={cat.title} className="category-img" />
+              <img 
+                src={cat.img} 
+                alt={cat.title} 
+                className="category-img" 
+                loading="lazy"
+                onError={(e) => {
+                  e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
+                }}
+              />
               <div className="category-content">
                 <h3 className="category-title">
                   {cat.title}

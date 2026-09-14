@@ -1,16 +1,66 @@
-# React + Vite
+# 🛒 Saraswathi Super Market Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A modern, fast, responsive web application for Saraswathi Super Market with Supabase Authentication, live offer publishing, festival banner settings, and Vercel deployment readiness.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Features
 
-## React Compiler
+- **Supabase Authentication**: Secure Email & Password staff login with persistent sessions using `@supabase/supabase-js`.
+- **Admin Dashboard**: Manage weekly grocery offers, brand tags, categories, discounts, expiry dates, and global announcement banners.
+- **Cloud Database Sync**: Real-time sync with Supabase `offers` and `site_settings` tables (with seamless local storage fallback).
+- **Vercel Ready**: Preconfigured with `vercel.json` SPA routing rewrites and production security headers.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🛠️ Local Setup & Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Set up Environment Variables**:
+   Create a `.env` file in the project root (copy from `.env.example`):
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key-here
+   VITE_ADMIN_USERNAME=admin
+   VITE_ADMIN_PASSWORD=saraswati2026
+   ```
+
+3. **Start local development server**:
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## ⚡ Supabase Setup Instructions
+
+1. **Create a Supabase Project**:
+   Sign up / Log in to [Supabase](https://supabase.com) and create a new project.
+
+2. **Execute Database Schema**:
+   Go to your Supabase SQL Editor and run the SQL schema script provided in `supabase_schema.sql`.
+
+3. **Enable Email Authentication**:
+   In Supabase Dashboard under **Authentication > Providers**, ensure **Email** is enabled.
+
+4. **Copy API Keys**:
+   Get your Project URL and Anon Key from **Settings > API** and add them to your `.env` file or Vercel Environment Variables.
+
+---
+
+## ☁️ Deploying to Vercel
+
+1. **Push your repository** to GitHub, GitLab, or Bitbucket.
+2. Log in to [Vercel](https://vercel.com) and click **Add New > Project**.
+3. Import your Saraswathi repository.
+4. Framework Preset: **Vite**.
+5. In **Environment Variables**, add:
+   - `VITE_SUPABASE_URL`: Your Supabase Project URL
+   - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon Key
+   - `VITE_ADMIN_USERNAME`: `admin` (or custom fallback username)
+   - `VITE_ADMIN_PASSWORD`: `saraswati2026` (or custom fallback password)
+6. Click **Deploy**. Vercel will automatically build and publish your site with SPA routing support configured in `vercel.json`.

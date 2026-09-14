@@ -42,20 +42,24 @@ export default function Home({ offers, setActivePage }) {
 
   const photoStripImages = [
     {
-      url: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400",
+      url: "/shop/vegetables.jpg",
+      fallback: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400",
       alt: "Fresh Produce Section"
     },
     {
-      url: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=400",
+      url: "/shop/spices.jpg",
+      fallback: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=400",
       alt: "Spices and Provisions"
     },
     {
-      url: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=400",
+      url: "/shop/aisles.jpg",
+      fallback: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=400",
       alt: "Organized Grocery Aisles"
     },
     {
-      url: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=400",
-      alt: "Supermarket Shelves"
+      url: "/shop/frontage.jpg",
+      fallback: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=400",
+      alt: "Supermarket Frontage"
     }
   ];
 
@@ -246,7 +250,15 @@ export default function Home({ offers, setActivePage }) {
           <div className="photo-strip">
             {photoStripImages.map((img, idx) => (
               <div key={idx} className="photo-strip-item">
-                <img src={img.url} alt={img.alt} className="photo-strip-img" />
+                <img 
+                  src={img.url} 
+                  alt={img.alt} 
+                  className="photo-strip-img" 
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.src = img.fallback;
+                  }}
+                />
               </div>
             ))}
           </div>

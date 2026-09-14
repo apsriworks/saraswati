@@ -8,6 +8,7 @@ import Products from './pages/Products';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import Admin from './pages/Admin';
+import { fetchOffersFromSupabase, fetchSiteSettingsFromSupabase, isSupabaseConfigured } from './lib/supabase';
 
 // Default mock offers to seed the application on first-time load
 const getDefaultOffers = () => {
@@ -84,17 +85,19 @@ const getDefaultOffers = () => {
   ];
 };
 
+const DEFAULT_BANNER = {
+  show: true,
+  text: '🌾 Store Discounts & Weekly Specials! Special prices on grocery kits, rice bags, and oil packs this week! 🌾'
+};
+
 function App() {
   const [activePage, setActivePage] = useState('home');
   const [offers, setOffers] = useState([]);
-  const [bannerSettings, setBannerSettings] = useState({
-    show: true,
-    text: '🌾 Pongal Celebration Deals! Special store discounts on grocery kits and oil packs this week! 🌾'
-  });
+  const [bannerSettings, setBannerSettings] = useState(DEFAULT_BANNER);
 
-  // Load and seed offers & banner settings from localStorage on mount
+  // Load initial state from localStorage or default mocks, then sync from Supabase if connected
   useEffect(() => {
-    // Offers loading
+    // 1. Initial Local Cache / Default Seed
     const localOffers = localStorage.getItem('saraswati_offers');
     if (localOffers) {
       try {
@@ -109,7 +112,6 @@ function App() {
       localStorage.setItem('saraswati_offers', JSON.stringify(defaultOffers));
     }
 
-    // Banner settings loading
     const localBanner = localStorage.getItem('saraswati_banner_settings');
     if (localBanner) {
       try {
@@ -118,7 +120,24 @@ function App() {
         console.error("Error parsing banner settings", e);
       }
     } else {
-      localStorage.setItem('saraswati_banner_settings', JSON.stringify(bannerSettings));
+      localStorage.setItem('saraswati_banner_settings', JSON.stringify(DEFAULT_BANNER));
+    }
+
+    // 2. Fetch fresh data from Supabase Cloud DB if configured
+    if (isSupabaseConfigured()) {
+      fetchOffersFromSupabase().then((dbOffers) => {
+        if (dbOffers && dbOffers.length > 0) {
+          setOffers(dbOffers);
+          localStorage.setItem('saraswati_offers', JSON.stringify(dbOffers));
+        }
+      });
+
+      fetchSiteSettingsFromSupabase().then((dbBanner) => {
+        if (dbBanner) {
+          setBannerSettings(dbBanner);
+          localStorage.setItem('saraswati_banner_settings', JSON.stringify(dbBanner));
+        }
+      });
     }
   }, []);
 

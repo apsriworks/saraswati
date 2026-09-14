@@ -18,19 +18,23 @@ export default function About() {
 
   const galleryItems = [
     {
-      url: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600",
+      url: "/shop/vegetables.jpg",
+      fallback: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600",
       caption: "Our Fresh Vegetables Section"
     },
     {
-      url: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600",
+      url: "/shop/aisles.jpg",
+      fallback: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=600",
       caption: "Spacious Aisles for Easy Shopping"
     },
     {
-      url: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600",
+      url: "/shop/spices.jpg",
+      fallback: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600",
       caption: "Rich Collection of Spices and Provisions"
     },
     {
-      url: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=600",
+      url: "/shop/counter.jpg",
+      fallback: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=600",
       caption: "Fully Stocked Household Staples"
     }
   ];
@@ -82,9 +86,13 @@ export default function About() {
           
           <div style={{ borderRadius: 'var(--border-radius)', overflow: 'hidden', border: '3px solid var(--basket-tan)', boxShadow: 'var(--shadow-md)', height: '360px' }}>
             <img 
-              src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600" 
+              src="/shop/frontage.jpg" 
               alt="Saraswathi Store View" 
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              loading="lazy"
+              onError={(e) => {
+                e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600';
+              }}
             />
           </div>
         </div>
@@ -112,7 +120,15 @@ export default function About() {
           <div className="grid grid-2" style={{ gap: '1.5rem' }}>
             {galleryItems.map((item, idx) => (
               <div key={idx} style={{ position: 'relative', borderRadius: 'var(--border-radius)', overflow: 'hidden', height: '240px', border: '1px solid var(--basket-tan)', boxShadow: 'var(--shadow-sm)' }}>
-                <img src={item.url} alt={item.caption} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img 
+                  src={item.url} 
+                  alt={item.caption} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.src = item.fallback;
+                  }}
+                />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', padding: '1rem', color: 'var(--white)', fontWeight: '600' }}>
                   {item.caption}
                 </div>

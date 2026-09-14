@@ -1,10 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import {
+  isSupabaseConfigured,
+  signInWithSupabase,
+  signUpWithSupabase,
+  signOutFromSupabase,
+  getSupabaseSession,
+  onSupabaseAuthStateChange,
+  saveOfferToSupabase,
+  deleteOfferFromSupabase,
+  saveSiteSettingToSupabase
+} from '../lib/supabase';
 
 export default function Admin({ offers, setOffers, bannerSettings, setBannerSettings }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authMode, setAuthMode] = useState('fallback'); // 'supabase' | 'fallback'
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  
+  // Login Form States
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State for Add/Edit Offer
   const [editingId, setEditingId] = useState(null);
@@ -22,19 +41,108 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
   const [bannerShow, setBannerShow] = useState(bannerSettings.show);
   const [bannerText, setBannerText] = useState(bannerSettings.text);
 
-  // Check existing login session on mount
-  useEffect(() => {
-    const session = sessionStorage.getItem('saraswati_admin_logged');
-    if (session === 'true') {
-      setIsLoggedIn(true);
-    }
-  }, []);
+  const hasSupabaseConfig = isSupabaseConfigured();
 
-  const handleLogin = (e) => {
+  // Keep bannerShow and bannerText updated if bannerSettings prop updates
+  useEffect(() => {
+    setBannerShow(bannerSettings.show);
+    setBannerText(bannerSettings.text);
+  }, [bannerSettings]);
+
+  // Check Supabase session & local fallback session on mount
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    if (hasSupabaseConfig) {
+      // 1. Initial Supabase session check
+      getSupabaseSession().then((session) => {
+        if (session && session.user) {
+          setIsLoggedIn(true);
+          setAuthMode('supabase');
+          setCurrentUserEmail(session.user.email || '');
+        } else {
+          // Check fallback session if no Supabase session
+          const fallbackSession = sessionStorage.getItem('saraswati_admin_logged');
+          if (fallbackSession === 'true') {
+            setIsLoggedIn(true);
+            setAuthMode('fallback');
+          }
+        }
+      });
+
+      // 2. Listen to Auth State Changes in Supabase
+      unsubscribe = onSupabaseAuthStateChange((_event, session) => {
+        if (session && session.user) {
+          setIsLoggedIn(true);
+          setAuthMode('supabase');
+          setCurrentUserEmail(session.user.email || '');
+        } else {
+          const fallbackSession = sessionStorage.getItem('saraswati_admin_logged');
+          if (fallbackSession !== 'true') {
+            setIsLoggedIn(false);
+            setAuthMode('fallback');
+            setCurrentUserEmail('');
+          }
+        }
+      });
+    } else {
+      // Local fallback session check when Supabase is not configured
+      const fallbackSession = sessionStorage.getItem('saraswati_admin_logged');
+      if (fallbackSession === 'true') {
+        setIsLoggedIn(true);
+        setAuthMode('fallback');
+      }
+    }
+
+    return () => {
+      unsubscribe();
+    };
+  }, [hasSupabaseConfig]);
+
+  // Handle Supabase Auth Login / Register
+  const handleSupabaseAuth = async (e) => {
     e.preventDefault();
-    // Static credentials for local administrator
-    if (username === 'admin' && password === 'saraswati2026') {
+    setLoginError('');
+    setLoginSuccess('');
+    setIsSubmitting(true);
+
+    try {
+      if (isSignUp) {
+        const data = await signUpWithSupabase(email, password);
+        if (data.session) {
+          setIsLoggedIn(true);
+          setAuthMode('supabase');
+          setCurrentUserEmail(data.user?.email || email);
+          setLoginSuccess('Account created and authenticated successfully!');
+        } else {
+          setLoginSuccess('Registration successful! Check your email inbox to confirm your account.');
+        }
+      } else {
+        const data = await signInWithSupabase(email, password);
+        if (data.session) {
+          setIsLoggedIn(true);
+          setAuthMode('supabase');
+          setCurrentUserEmail(data.user?.email || email);
+          setLoginSuccess('Logged in successfully via Supabase!');
+        }
+      }
+    } catch (err) {
+      console.error('Supabase Auth error:', err);
+      setLoginError(err.message || 'Authentication failed. Please check your email and password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Fallback Local Admin Login
+  const handleFallbackLogin = (e) => {
+    e.preventDefault();
+    const validUser = import.meta.env.VITE_ADMIN_USERNAME || 'admin';
+    const validPass = import.meta.env.VITE_ADMIN_PASSWORD || 'saraswati2026';
+
+    if (username.trim() === validUser && password === validPass) {
       setIsLoggedIn(true);
+      setAuthMode('fallback');
       sessionStorage.setItem('saraswati_admin_logged', 'true');
       setLoginError('');
     } else {
@@ -42,15 +150,20 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
     }
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    if (authMode === 'supabase') {
+      await signOutFromSupabase();
+    }
     sessionStorage.removeItem('saraswati_admin_logged');
+    setIsLoggedIn(false);
+    setAuthMode('fallback');
+    setCurrentUserEmail('');
   };
 
-  // Helper date for check expiry
+  // Helper date for checking offer expiry
   const today = new Date().toISOString().split('T')[0];
 
-  // Quick preset images for grocery items to make demo uploads easy
+  // Quick preset images for grocery items
   const presetImages = [
     { label: "Oils / Cooking", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=300" },
     { label: "Rice / Provisions", url: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300" },
@@ -59,11 +172,23 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
     { label: "Beverages / Snacks", url: "https://images.unsplash.com/photo-1599490659273-e3b6900d1487?auto=format&fit=crop&q=80&w=300" }
   ];
 
+  // Validate URL scheme to prevent javascript: or data: injection
+  const isValidImageUrl = (url) => {
+    if (!url) return true;
+    const cleanUrl = url.trim().toLowerCase();
+    return cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://') || cleanUrl.startsWith('/');
+  };
+
   // Add or Update offer
-  const handleSubmitOffer = (e) => {
+  const handleSubmitOffer = async (e) => {
     e.preventDefault();
     if (!offerName || !offerValue) {
       alert("Please fill in Name and Value fields.");
+      return;
+    }
+
+    if (offerImage && !isValidImageUrl(offerImage)) {
+      alert("Please enter a valid image URL starting with http://, https://, or /");
       return;
     }
 
@@ -91,6 +216,21 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
 
     setOffers(updatedOffers);
     localStorage.setItem('saraswati_offers', JSON.stringify(updatedOffers));
+
+    // Also sync to Supabase database if configured
+    if (hasSupabaseConfig) {
+      try {
+        const saved = await saveOfferToSupabase(newOffer);
+        if (saved && saved.id && saved.id !== newOffer.id) {
+          // Update local state with real Supabase generated UUID
+          const syncedOffers = updatedOffers.map(o => o.id === newOffer.id ? saved : o);
+          setOffers(syncedOffers);
+          localStorage.setItem('saraswati_offers', JSON.stringify(syncedOffers));
+        }
+      } catch (err) {
+        console.warn('Note: Cloud DB sync error (offer saved locally):', err);
+      }
+    }
 
     // Clear form
     resetForm();
@@ -122,72 +262,187 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
     setFestivalTag(offer.festival_tag || '');
   };
 
-  const handleDeleteOffer = (id) => {
+  const handleDeleteOffer = async (id) => {
     if (window.confirm("Are you sure you want to delete this offer?")) {
       const updated = offers.filter(o => o.id !== id);
       setOffers(updated);
       localStorage.setItem('saraswati_offers', JSON.stringify(updated));
+
+      if (hasSupabaseConfig) {
+        try {
+          await deleteOfferFromSupabase(id);
+        } catch (err) {
+          console.warn('Note: Could not delete from Cloud DB:', err);
+        }
+      }
     }
   };
 
   // Save global festival banner settings
-  const handleSaveBanner = (e) => {
+  const handleSaveBanner = async (e) => {
     e.preventDefault();
     const updatedBanner = { show: bannerShow, text: bannerText };
     setBannerSettings(updatedBanner);
     localStorage.setItem('saraswati_banner_settings', JSON.stringify(updatedBanner));
+
+    if (hasSupabaseConfig) {
+      try {
+        await saveSiteSettingToSupabase('banner', updatedBanner);
+      } catch (err) {
+        console.warn('Note: Could not save banner to Cloud DB:', err);
+      }
+    }
+
     alert("Festival banner settings saved!");
   };
 
   // Admin Login Screen
   if (!isLoggedIn) {
     return (
-      <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="admin-login-card">
-          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--leaf-green)', textAlign: 'center', marginBottom: '0.5rem' }}>
-            Staff Login
+      <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+        <div className="admin-login-card" style={{ maxWidth: '440px', width: '100%' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--leaf-green)', textAlign: 'center', marginBottom: '0.25rem' }}>
+            Staff Admin Login
           </h2>
-          <p style={{ textAlign: 'center', color: 'var(--ink-light)', fontSize: '0.85rem', marginBottom: '2rem' }}>
+          <p style={{ textAlign: 'center', color: 'var(--ink-light)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
             சரஸ்வதி சூப்பர் மார்க்கெட் - நிர்வாகி உள்நுழைவு
           </p>
 
-          <form onSubmit={handleLogin}>
-            <div className="form-group">
-              <label htmlFor="username">Username</label>
-              <input 
-                type="text" 
-                id="username" 
-                className="form-control" 
-                value={username} 
-                onChange={(e) => setUsername(e.target.value)} 
-                required 
-              />
+          {/* Configuration Status Notice */}
+          {hasSupabaseConfig ? (
+            <div style={{ background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '6px', padding: '0.75rem', marginBottom: '1.5rem', fontSize: '0.8rem', color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>⚡</span>
+              <span><strong>Supabase Cloud Auth Active:</strong> Log in or create an admin account below.</span>
             </div>
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label htmlFor="password">Password</label>
-              <input 
-                type="password" 
-                id="password" 
-                className="form-control" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                required 
-              />
+          ) : (
+            <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px', padding: '0.75rem', marginBottom: '1.5rem', fontSize: '0.8rem', color: '#b78103' }}>
+              <div><strong>⚡ Supabase Auth Ready</strong></div>
+              <div style={{ marginTop: '0.2rem' }}>Add <code>VITE_SUPABASE_URL</code> & <code>VITE_SUPABASE_ANON_KEY</code> to enable live cloud authentication. Standard login active below.</div>
             </div>
+          )}
 
-            {loginError && (
-              <p style={{ color: 'var(--brick)', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '1rem', textAlign: 'center' }}>
-                {loginError}
+          {/* Form Switcher for Supabase Auth vs Fallback */}
+          {hasSupabaseConfig ? (
+            <div>
+              <div style={{ display: 'flex', borderRadius: '6px', background: '#f0ece1', padding: '3px', marginBottom: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(false)}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    background: !isSignUp ? 'var(--leaf-green)' : 'transparent',
+                    color: !isSignUp ? '#fff' : 'var(--ink-color)'
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(true)}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    background: isSignUp ? 'var(--leaf-green)' : 'transparent',
+                    color: isSignUp ? '#fff' : 'var(--ink-color)'
+                  }}
+                >
+                  Register Account
+                </button>
+              </div>
+
+              <form onSubmit={handleSupabaseAuth}>
+                <div className="form-group">
+                  <label htmlFor="email">Email Address</label>
+                  <input 
+                    type="email" 
+                    id="email" 
+                    className="form-control" 
+                    placeholder="admin@saraswati.com"
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label htmlFor="password">Password</label>
+                  <input 
+                    type="password" 
+                    id="password" 
+                    className="form-control" 
+                    placeholder="••••••••"
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                {loginError && (
+                  <p style={{ color: 'var(--brick)', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '1rem', textAlign: 'center' }}>
+                    {loginError}
+                  </p>
+                )}
+
+                {loginSuccess && (
+                  <p style={{ color: '#2e7d32', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '1rem', textAlign: 'center' }}>
+                    {loginSuccess}
+                  </p>
+                )}
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={isSubmitting}>
+                  {isSubmitting ? 'Authenticating...' : (isSignUp ? 'Create Supabase Admin Account' : 'Log In with Supabase')}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <form onSubmit={handleFallbackLogin}>
+              <div className="form-group">
+                <label htmlFor="username">Username</label>
+                <input 
+                  type="text" 
+                  id="username" 
+                  className="form-control" 
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)} 
+                  required 
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label htmlFor="password">Password</label>
+                <input 
+                  type="password" 
+                  id="password" 
+                  className="form-control" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                />
+              </div>
+
+              {loginError && (
+                <p style={{ color: 'var(--brick)', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '1rem', textAlign: 'center' }}>
+                  {loginError}
+                </p>
+              )}
+
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+                Log In
+              </button>
+              <p style={{ textAlign: 'center', color: '#a89c94', fontSize: '0.75rem', marginTop: '1.5rem' }}>
+                Demo credentials: <code>admin</code> / <code>saraswati2026</code>
               </p>
-            )}
-
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-              Log In
-            </button>
-            <p style={{ textAlign: 'center', color: '#a89c94', fontSize: '0.75rem', marginTop: '1.5rem' }}>
-              Demo access credentials: <code>admin</code> / <code>saraswati2026</code>
-            </p>
-          </form>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -204,10 +459,21 @@ export default function Admin({ offers, setOffers, bannerSettings, setBannerSett
         {/* Header Bar */}
         <div className="admin-header-bar">
           <div className="admin-title-wrap">
-            <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--leaf-green)', margin: 0 }}>
-              Saraswathi Store Admin Panel
-            </h2>
-            <span style={{ fontSize: '0.85rem', color: 'var(--ink-light)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--leaf-green)', margin: 0 }}>
+                Saraswathi Store Admin Panel
+              </h2>
+              {authMode === 'supabase' ? (
+                <span style={{ fontSize: '0.75rem', background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', padding: '0.2rem 0.5rem', borderRadius: '12px', fontWeight: '600' }}>
+                  ⚡ Supabase Authenticated ({currentUserEmail})
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', background: '#fff3e0', color: '#e65100', border: '1px solid #ffe0b2', padding: '0.2rem 0.5rem', borderRadius: '12px', fontWeight: '600' }}>
+                  🔑 Local Credentials Mode
+                </span>
+              )}
+            </div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--ink-light)', display: 'block', marginTop: '0.25rem' }}>
               Weekly Offers, Brand tags, and global banner management dashboard.
             </span>
           </div>
